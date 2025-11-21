@@ -471,3 +471,18 @@ class GaussianModel:
     def add_densification_stats(self, viewspace_point_tensor, update_filter):
         self.xyz_gradient_accum[update_filter] += torch.norm(viewspace_point_tensor.grad[update_filter,:2], dim=-1, keepdim=True)
         self.denom[update_filter] += 1
+
+    def get_features(self):
+        # Example: use spherical harmonic coefficients as features
+        # SH has shape (N, 3, (degree+1)^2)
+        # Flatten per-Gaussian features
+        features_dc = self._features_dc
+        features_rest = self._features_rest
+        return torch.cat((features_dc, features_rest), dim=1)
+
+    def set_features(self, fused_features):
+        # fused_features must have same shape as active_sh_coefficients
+        num_dc_channels = self._features_dc.shape[1] * self._features_dc.shape[2]
+        self._features_dc = nn.Parameter(fused_features[:, :num_dc_channels].view(-1, self._features_dc.shape[1], self._features_dc.shape[2]).contiguous().requires_grad_(True))
+        self._features_rest = nn.Parameter(fused_features[:, num_dc_channels:].view(-1, self._features_rest.shape[1], self._features_rest.shape[2]).contiguous().requires_grad_(True))
+
